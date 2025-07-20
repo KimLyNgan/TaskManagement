@@ -1,48 +1,37 @@
 // task_management/frontend/src/app/login/page.tsx
-"use client"; // <-- Đánh dấu là Client Component vì có tương tác người dùng và state
+"use client";
 import "@ant-design/v5-patch-for-react-19";
 
-import React, { useState } from "react";
-import { Form, Input, Button, Card, Typography, message, Flex } from "antd";
+import React, { useEffect } from "react";
+import { Form, Input, Button, Card, Typography, Flex } from "antd";
 import { LockOutlined, MailOutlined } from "@ant-design/icons";
 import Link from "next/link";
-import { useRouter } from "next/navigation"; // <-- Dùng next/navigation cho App Router
-import axios from "axios"; // <-- Sẽ cài đặt axios sau
+import { useRouter } from "next/navigation";
+import { useUserStore, LoginPayLoad } from "@/store/userStore";
 
 const { Title, Text } = Typography;
 
 const LoginPage: React.FC = () => {
-   const [loading, setLoading] = useState(false);
+   const { loading, isAuthenticated, login, fetchProfile } = useUserStore();
    const router = useRouter();
-   const [form] = Form.useForm();
+   const [form] = Form.useForm<LoginPayLoad>();
 
-   const onFinish = async (values: any) => {
-      // Tạm thời dùng any, sẽ tạo interface DTO sau
-      setLoading(true);
-      try {
-         // Gọi API đăng nhập từ backend
-         // Đảm bảo URL này khớp với cấu hình NestJS của bạn
-         await axios.post(
-            "http://localhost:8080/api/v1/auth/login",
-            {
-               email: values.email,
-               password: values.password,
-            },
-            {
-               withCredentials: true, // Rất quan trọng để gửi cookies (bao gồm HttpOnly cookie)
-            }
-         );
-         message.success("Đăng nhập thành công! Đang chuyển hướng...");
-         router.push("/profile"); // Chuyển hướng đến trang profile
-      } catch (error: any) {
-         // Xử lý lỗi từ backend
-         const errorMessage = error.response?.data?.message || "Đăng nhập thất bại. Vui lòng thử lại.";
-         message.error(errorMessage);
-         console.error("Login error:", error);
-      } finally {
-         setLoading(false);
+   const onFinish = async (values: LoginPayLoad) => {
+      const success = await login(values);
+      if (success) {
+         const profileFetched = await fetchProfile();
+         if (profileFetched) {
+            router.push("/profile");
+         } else {
+            router.push("/login");
+         }
       }
    };
+   // useEffect(() => {
+   //    if (isAuthenticated) {
+   //       router.push("/profile");
+   //    }
+   // }, [isAuthenticated, router]);
 
    return (
       <Flex align="center" justify="center" style={{ minHeight: "100vh", padding: "20px" }}>

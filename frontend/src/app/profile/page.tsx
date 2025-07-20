@@ -2,89 +2,46 @@
 "use client";
 import "@ant-design/v5-patch-for-react-19";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Card, Typography, Button, Spin, Result, Flex } from "antd";
 import { UserOutlined, MailOutlined, SettingOutlined, LogoutOutlined } from "@ant-design/icons";
 import { useRouter } from "next/navigation";
-import axios from "axios"; // Sẽ cài đặt axios
-import { message } from "antd"; // Import message
+import { useUserStore } from "@/store/userStore";
 
 const { Title, Text } = Typography;
 
-// Định nghĩa interface cho dữ liệu người dùng nhận từ backend
-interface UserProfile {
-   _id: string;
-   username: string;
-   email: string;
-   role: string;
-   createdAt: string;
-   updatedAt: string;
-   // ... có thể thêm các trường khác nếu có
-}
-
 const ProfilePage: React.FC = () => {
-   const [user, setUser] = useState<UserProfile | null>(null);
-   const [loading, setLoading] = useState(true);
-   const [error, setError] = useState<string | null>(null);
+   const { user, loading, error, isAuthenticated, fetchProfile, logout, resetState } = useUserStore();
    const router = useRouter();
 
    useEffect(() => {
-      const fetchProfile = async () => {
-         try {
-            setLoading(true);
-            // Gọi API profile từ backend
-            const response = await axios.get<UserProfile>("http://localhost:8080/api/v1/auth/profile", {
-               withCredentials: true, // Rất quan trọng để gửi cookies
-            });
-            setUser(response.data);
-         } catch (err: any) {
-            console.error("Fetch profile error:", err);
-            setError(err.response?.data?.message || "Không thể tải thông tin profile. Vui lòng đăng nhập lại.");
-            // Nếu lỗi 401 Unauthorized, chuyển hướng về trang đăng nhập
-            if (err.response?.status === 401) {
-               router.push("/login");
-               message.error("Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.");
-            } else {
-               message.error("Có lỗi xảy ra khi tải profile.");
-            }
-         } finally {
-            setLoading(false);
-         }
-      };
+      if (!isAuthenticated && !loading && !user) {
+         fetchProfile();
+      }
+   }, [isAuthenticated, loading, user, fetchProfile]);
 
-      fetchProfile();
-   }, [router]); // Thêm router vào dependencies để hook chạy lại khi router thay đổi (ít xảy ra nhưng tốt)
+   useEffect(() => {
+      if (!isAuthenticated && !loading && !user && error) {
+         router.push("/login");
+      }
+   }, [isAuthenticated, loading, user, error, router]);
 
    const handleLogout = async () => {
-      setLoading(true);
-      try {
-         await axios.post(
-            "http://localhost:8080/api/v1/auth/logout",
-            {},
-            {
-               withCredentials: true,
-            }
-         );
-         message.success("Đăng xuất thành công!");
-         router.push("/login"); // Chuyển hướng về trang đăng nhập
-      } catch (err: any) {
-         console.error("Logout error:", err);
-         message.error(err.response?.data?.message || "Đăng xuất thất bại. Vui lòng thử lại.");
-      } finally {
-         setLoading(false);
-      }
+      await logout();
+      router.push("/login");
+      resetState();
    };
-
    if (loading) {
       return (
          <Flex align="center" justify="center" style={{ minHeight: "100vh" }}>
-            {/* <Spin size="large" tip="Đang tải profile..." /> */}
-            <h1>dang tai</h1>
+            <Spin size="large" tip="Đang tải profile...">
+               <div style={{ minHeight: 100 }} />
+            </Spin>
          </Flex>
       );
    }
 
-   if (error) {
+   if (error && !isAuthenticated) {
       return (
          <Result
             status="error"
@@ -99,11 +56,12 @@ const ProfilePage: React.FC = () => {
       );
    }
 
-   if (!user) {
+   if (!user && !isAuthenticated && !loading) {
       return (
          <Result
             status="warning"
             title="Không tìm thấy thông tin người dùng"
+            subTitle="Phiên đăng nhập đã hết hạn, vui lòng đằng nhập lại"
             extra={
                <Button type="primary" onClick={() => router.push("/login")}>
                   Đăng nhập
@@ -112,6 +70,7 @@ const ProfilePage: React.FC = () => {
          />
       );
    }
+   if (!user) return null;
 
    return (
       <Flex align="center" justify="center" style={{ minHeight: "100vh", padding: "20px" }}>

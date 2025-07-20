@@ -1,40 +1,27 @@
 "use client";
 import "@ant-design/v5-patch-for-react-19";
-import React, { useState } from "react";
-import { Form, Input, Button, Card, Typography, message, Flex } from "antd";
+import React from "react";
+import { Form, Input, Button, Card, Typography, Flex } from "antd";
 import { UserOutlined, LockOutlined, MailOutlined } from "@ant-design/icons";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { useUserStore, RegisterPayLoad } from "@/store/userStore";
 
 const { Title, Text } = Typography;
 
 const RegisterPage: React.FC = () => {
-   const [loading, setLoading] = useState(false);
+   const { loading, register } = useUserStore();
    const router = useRouter();
-   const [form] = Form.useForm();
+   const [form] = Form.useForm<RegisterPayLoad>();
 
-   const onFinish = async (values: any) => {
-      // Tạm thời dùng any, sẽ tạo interface DTO sau
-      setLoading(true);
-      try {
-         // Gọi API đăng ký từ backend
-         await axios.post("http://localhost:8080/api/v1/auth/register", {
-            username: values.username,
-            email: values.email,
-            password: values.password,
-         });
-         message.success("Đăng ký thành công! Vui lòng đăng nhập.");
-         form.resetFields(); // Reset form sau khi đăng ký thành công
-         router.push("/login"); // Chuyển hướng đến trang đăng nhập
-      } catch (error: any) {
-         const errorMessage = error.response?.data?.message || "Đăng ký thất bại. Vui lòng thử lại.";
-         message.error(errorMessage);
-         console.error("Register error:", error);
-      } finally {
-         setLoading(false);
+   const onFinish = async (values: RegisterPayLoad) => {
+      const success = await register(values);
+      if (success) {
+         form.resetFields();
+         router.push("/login");
       }
    };
+
    return (
       <Flex align="center" justify="center" style={{ minHeight: "100vh", padding: "20px" }}>
          <Card style={{ width: 400, boxShadow: "0 4px 8px rgba(0,0,0,0.1)" }} hoverable>
