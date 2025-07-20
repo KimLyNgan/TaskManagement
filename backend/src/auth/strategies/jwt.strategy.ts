@@ -6,6 +6,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { JwtPayload } from 'jsonwebtoken';
 import { Model } from 'mongoose';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { Request } from 'express';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -13,34 +14,32 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     configService: ConfigService,
   ) {
+    const jwtSecret = configService.get<string>('JWT_SECRET');
+    if (!jwtSecret) {
+      throw new Error('JWT_SECRET is not defined in environment variables');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
-        (req: any) => {
-          // Lấy token từ cookie có tên 'access_token'
-          // req.cookies sẽ có sẵn sau khi cookie-parser được áp dụng
-          if (
-            req &&
-            req.cookies &&
-            typeof req.cookies.access_token === 'string'
-          ) {
+        (req: Request): string | null => {
+          if (req.cookies && typeof req.cookies.access_token === 'string') {
             return req.cookies.access_token;
           }
-          return null; // Nếu không tìm thấy cookie, trả về null
+          return null;
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET') || '',
+      secretOrKey: jwtSecret,
     });
   }
 
   async validate(payload: JwtPayload): Promise<User> {
     const { sub: userId } = payload;
-    const user = await this.userModel.findById(userId);
+    const userDocument = await this.userModel.findById(userId);
 
-    if (!user) {
+    if (!userDocument) {
       throw new UnauthorizedException('Invalid token or user not found');
     }
-    return user;
+    return userDocument.toObject();
   }
 }
